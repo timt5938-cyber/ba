@@ -1,0 +1,107 @@
+﻿#!/usr/bin/env bash
+set -euo pipefail
+
+# Dota Scope backend bootstrap for Ubuntu 24.04 LTS
+# Run: sudo bash backend_ubuntu_bootstrap.txt
+# NOTE: Ubuntu "24.02" does not exist. Use Ubuntu 24.04 LTS.
+
+APP_NAME="dota-scope"
+APP_USER="dotascope"
+APP_DIR="/opt/dota-scope"
+DB_NAME="dotascope"
+DB_USER="dotascope"
+DB_PASSWORD="change_me_strong_password"
+NODE_MAJOR="20"
+
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "Please run as root: sudo bash backend_ubuntu_bootstrap.txt"
+  exit 1
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+echo "[1/9] apt update/upgrade"
+apt-get update -y
+apt-get upgrade -y
+
+echo "[2/9] base packages"
+apt-get install -y \
+  ca-certificates \
+  curl \
+  gnupg \
+  lsb-release \
+  software-properties-common \
+  git \
+  unzip \
+  jq \
+  build-essential \
+  ufw
+
+echo "[3/9] Node.js ${NODE_MAJOR} + npm"
+if ! command -v node >/dev/null 2>&1; then
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+  apt-get install -y nodejs
+fi
+npm i -g pm2
+
+echo "[4/9] PostgreSQL + contrib"
+apt-get install -y postgresql postgresql-contrib
+systemctl enable postgresql
+systemctl restart postgresql
+
+echo "[5/9] Redis"
+apt-get install -y redis-server
+systemctl enable redis-server
+systemctl restart redis-server
+
+echo "[6/9] Nginx"
+apt-get install -y nginx
+systemctl enable nginx
+systemctl restart nginx
+
+echo "[7/9] Create app linux user and directory"
+id -u "${APP_USER}" >/dev/null 2>&1 || adduser --system --group --home "/home/${APP_USER}" "${APP_USER}"
+mkdir -p "${APP_DIR}" "/var/log/${APP_NAME}" "/etc/${APP_NAME}"
+chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}" "/var/log/${APP_NAME}" "/etc/${APP_NAME}"
+
+echo "[8/9] Create PostgreSQL role/database (idempotent)"
+sudo -u postgres psql <<SQL
+DO
+\$do\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DB_USER}') THEN
+    CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}';
+  END IF;
+END
+\$do\$;
+SQL
+
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1 || \
+  sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+
+echo "[9/9] Write backend env template"
+cat > "/etc/${APP_NAME}/.env" <<ENV
+NODE_ENV=production
+PORT=8080
+
+# Database
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}
+
+# Cache/queue
+REDIS_URL=redis://127.0.0.1:6379
+
+# App secrets (replace)
+JWT_ACCESS_SECRET=replace_access_secret
+JWT_REFRESH_SECRET=replace_refresh_secret
+
+# OpenDota (for proxy mode in backend)
+OPENDOTA_API_KEY=replace_opendota_api_key
+ENV
+
+chown "${APP_USER}:${APP_USER}" "/etc/${APP_NAME}/.env"
+chmod 640 "/etc/${APP_NAME}/.env"
+
+echo "Done. Installed: Node.js, npm, PM2, PostgreSQL, Redis, Nginx."
+echo "DB: ${DB_NAME}, user: ${DB_USER}"
+echo "Env template: /etc/${APP_NAME}/.env"
+echo "IMPORTANT: change DB_PASSWORD and secrets in this file before production launch."
