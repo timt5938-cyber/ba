@@ -33,6 +33,7 @@ export interface SyncResult {
 }
 
 export interface SteamBindingResult {
+  accountId?: string;
   profileUrl: string;
   vanityName?: string;
   steamId64?: string;

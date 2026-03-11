@@ -2,14 +2,13 @@
 import { useNavigate, useSearchParams } from 'react-router';
 import {
   ArrowLeft, User, Settings, RefreshCw, Download, Link2, Smartphone,
-  Trash2, Bell, ChevronRight, Eye, EyeOff, Check, AlertTriangle, LogOut,
-  X, Plus, Shield, FileText, Monitor, Star, Zap, CheckCircle2,
+  Trash2, Bell, ChevronRight, Check, AlertTriangle, LogOut,
+  X, Plus, FileText, Monitor, Star, Zap, CheckCircle2,
   Clock, Calendar, AlertCircle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { PLAYER, SYNC_HISTORY, DEVICES, ACHIEVEMENTS, formatTime } from '../data/mockData';
+import { PLAYER, SYNC_HISTORY, formatTime } from '../data/mockData';
 import { Badge, StatusDot } from '../components/ui/Badge';
-import { ProgressBar } from '../components/ui/ProgressBar';
 
 type Section =
   | 'cabinet'
@@ -49,9 +48,13 @@ function SectionHeader({ label, onBack, action }: { label: string; onBack: () =>
 
 // ─── Cabinet ─────────────────────────────────────────────────────────────────
 function CabinetSection({ onBack }: { onBack: () => void }) {
-  const { accentColor, showToast, logout, syncNow } = useApp();
+  const { accentColor, showToast, logout, syncNow, runtimeSnapshot, updateProfile } = useApp();
   const navigate = useNavigate();
   const [syncing, setSyncing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(runtimeSnapshot.player.name);
+  const [draftCountry, setDraftCountry] = useState(runtimeSnapshot.player.country);
+  const player = runtimeSnapshot.player;
 
   const handleSync = async () => {
     setSyncing(true);
@@ -74,18 +77,18 @@ function CabinetSection({ onBack }: { onBack: () => void }) {
               <span style={{ fontSize: 28 }}>🧙</span>
             </div>
             <div>
-              <p className="text-white" style={{ fontSize: 18, fontWeight: 700 }}>{PLAYER.name}</p>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>/{PLAYER.steamId}</p>
+              <p className="text-white" style={{ fontSize: 18, fontWeight: 700 }}>{player.name}</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>/{player.steamId}</p>
               <div className="flex gap-2 mt-1">
-                <Badge variant="gold">⚡ {PLAYER.rank}</Badge>
+                <Badge variant="gold">⚡ {player.rank}</Badge>
               </div>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'Матчей', value: PLAYER.totalMatches.toLocaleString() },
-              { label: 'Винрейт', value: `${PLAYER.winrate}%` },
-              { label: 'Avg KDA', value: PLAYER.avgKDA.toFixed(2) },
+              { label: 'Матчей', value: player.totalMatches.toLocaleString() },
+              { label: 'Винрейт', value: `${player.winrate}%` },
+              { label: 'Avg KDA', value: player.avgKDA.toFixed(2) },
             ].map(s => (
               <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 <p className="text-white" style={{ fontSize: 15, fontWeight: 700 }}>{s.value}</p>
@@ -98,12 +101,12 @@ function CabinetSection({ onBack }: { onBack: () => void }) {
         {/* Meta */}
         <div className="rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)' }}>
           {[
-            { label: 'Steam ID', value: PLAYER.id },
-            { label: 'Steam URL', value: `/${PLAYER.steamId}` },
-            { label: 'Дата регистрации', value: '15 янв 2024' },
-            { label: 'Последняя синхронизация', value: formatTime(PLAYER.lastSync) },
-            { label: 'Последняя активность', value: formatTime(PLAYER.lastMatch) },
-            { label: 'Страна', value: `🇷🇺 ${PLAYER.country}` },
+            { label: 'Steam ID', value: player.id },
+            { label: 'Steam URL', value: `/${player.steamId}` },
+            { label: 'Дата регистрации', value: new Date(player.registeredAt).toLocaleDateString('ru-RU') },
+            { label: 'Последняя синхронизация', value: formatTime(player.lastSync) },
+            { label: 'Последняя активность', value: formatTime(player.lastMatch) },
+            { label: 'Страна', value: player.country },
           ].map((s, i) => (
             <div key={s.label} className="flex justify-between items-center px-4 py-3"
               style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -117,7 +120,7 @@ function CabinetSection({ onBack }: { onBack: () => void }) {
         <div className="rounded-xl p-4" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-white mb-3" style={{ fontSize: 13, fontWeight: 600 }}>Достижения</p>
           <div className="grid grid-cols-3 gap-2">
-            {ACHIEVEMENTS.map(a => (
+            {(runtimeSnapshot.achievements as any[]).map(a => (
               <div key={a.id} className="flex flex-col items-center gap-1.5 p-3 rounded-xl"
                 style={{ background: a.completed ? `${accentColor}08` : 'rgba(255,255,255,0.03)', border: `1px solid ${a.completed ? accentColor + '20' : 'rgba(255,255,255,0.06)'}`, opacity: a.completed ? 1 : 0.45 }}>
                 <span style={{ fontSize: 24 }}>{a.icon}</span>
@@ -135,7 +138,7 @@ function CabinetSection({ onBack }: { onBack: () => void }) {
             <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
             {syncing ? 'Обновляем...' : 'Обновить статистику'}
           </button>
-          <button onClick={() => showToast('Форма редактирования открыта', 'info')}
+          <button onClick={() => setEditing(true)}
             className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.65)' }}>
             Изменить профиль
@@ -146,6 +149,31 @@ function CabinetSection({ onBack }: { onBack: () => void }) {
             <LogOut size={15} /> Выйти
           </button>
         </div>
+        {editing && (
+          <div className="rounded-xl p-4" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <p className="text-white mb-3" style={{ fontSize: 14, fontWeight: 700 }}>Редактирование профиля</p>
+            <div className="flex flex-col gap-2">
+              <input value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder="Никнейм"
+                className="w-full px-3 py-2.5 rounded-xl text-white placeholder:text-white/25 outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+              <input value={draftCountry} onChange={(e) => setDraftCountry(e.target.value)} placeholder="Страна"
+                className="w-full px-3 py-2.5 rounded-xl text-white placeholder:text-white/25 outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { updateProfile({ name: draftName.trim() || player.name, country: draftCountry.trim() || player.country }); setEditing(false); showToast('Профиль обновлён', 'success'); }}
+                  className="flex-1 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ADE80', fontSize: 13, fontWeight: 700 }}>
+                  Сохранить
+                </button>
+                <button onClick={() => { setEditing(false); setDraftName(player.name); setDraftCountry(player.country); }}
+                  className="flex-1 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -153,20 +181,19 @@ function CabinetSection({ onBack }: { onBack: () => void }) {
 
 // ─── Settings (incl. Security) ────────────────────────────────────────────────
 function SettingsSection({ onBack }: { onBack: () => void }) {
-  const { theme, setTheme, showToast } = useApp();
-  const [lang, setLang] = useState('ru');
+  const { theme, setTheme, showToast, runtimeSnapshot } = useApp();
   const [syncFreq, setSyncFreq] = useState('Каждые 6 часов');
   const [notifications, setNotifications] = useState({ matches: true, winrate: true, builds: false, system: true });
-  const [showOldPw, setShowOldPw] = useState(false);
-  const [showNewPw, setShowNewPw] = useState(false);
-  const [biometric, setBiometric] = useState(true);
-  const [twoFa, setTwoFa] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const themes = [
     { id: 'bw' as const,    label: 'Чёрно-белая',   accent: '#FFFFFF', bg: '#1A1A1A' },
     { id: 'red' as const,   label: 'Красно-чёрная', accent: '#EF4444', bg: '#1A0808' },
     { id: 'green' as const, label: 'Зелено-чёрная', accent: '#22C55E', bg: '#081A0D' },
   ];
+  const cacheKb = Math.round(JSON.stringify(runtimeSnapshot).length / 1024);
+  const appVersion = (import.meta as any)?.env?.VITE_APP_VERSION || '2.4.1';
+  const appBuild = (import.meta as any)?.env?.VITE_APP_BUILD || '241';
 
   return (
     <>
@@ -186,20 +213,6 @@ function SettingsSection({ onBack }: { onBack: () => void }) {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Language */}
-        <div className="rounded-xl p-4" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-white mb-3" style={{ fontSize: 13, fontWeight: 600 }}>Язык интерфейса</p>
-          {['ru', 'en', 'zh'].map(l => (
-            <button key={l} onClick={() => setLang(l)} className="w-full flex items-center justify-between py-2.5"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>
-                {l === 'ru' ? '🇷🇺 Русский' : l === 'en' ? '🇺🇸 English' : '🇨🇳 中文'}
-              </span>
-              {lang === l && <Check size={15} color="#4ADE80" />}
-            </button>
-          ))}
         </div>
 
         {/* Sync */}
@@ -235,59 +248,49 @@ function SettingsSection({ onBack }: { onBack: () => void }) {
           ))}
         </div>
 
-        {/* ── Security (merged here) ── */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.8 }}>БЕЗОПАСНОСТЬ</p>
-
-        {/* Change password */}
         <div className="rounded-xl p-4" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-white mb-3" style={{ fontSize: 13, fontWeight: 600 }}>Смена пароля</p>
-          {[{ label: 'Текущий пароль', show: showOldPw, setShow: setShowOldPw }, { label: 'Новый пароль', show: showNewPw, setShow: setShowNewPw }].map(f => (
-            <div key={f.label} className="relative mb-3">
-              <input type={f.show ? 'text' : 'password'} placeholder={f.label}
-                className="w-full pr-12 pl-4 py-3 rounded-xl text-white placeholder:text-white/30 outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 14 }} />
-              <button type="button" onClick={() => f.setShow(!f.show)} className="absolute right-3 top-1/2 -translate-y-1/2">
-                {f.show ? <EyeOff size={16} color="rgba(255,255,255,0.35)" /> : <Eye size={16} color="rgba(255,255,255,0.35)" />}
-              </button>
-            </div>
-          ))}
-          <button onClick={() => showToast('Пароль успешно изменён', 'success')}
-            className="w-full py-3 rounded-xl"
-            style={{ background: 'rgba(255,255,255,0.08)', fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>
-            Изменить пароль
+          <p className="text-white mb-3" style={{ fontSize: 13, fontWeight: 600 }}>Кэш и онлайн-данные</p>
+          <div className="flex items-center justify-between py-2.5">
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Размер кэша</span>
+            <span style={{ fontSize: 13, color: '#FFFFFF' }}>{cacheKb} KB</span>
+          </div>
+          <div className="flex items-center justify-between py-2.5">
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Оффлайн режим</span>
+            <button onClick={() => setOfflineMode(v => !v)} className="w-11 h-6 rounded-full flex items-center px-0.5 transition-colors"
+              style={{ background: offlineMode ? '#4ADE80' : 'rgba(255,255,255,0.15)', justifyContent: offlineMode ? 'flex-end' : 'flex-start' }}>
+              <div className="w-5 h-5 rounded-full bg-white" />
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem('dota_scope_runtime_data_v1');
+              showToast('Кэш очищен. Перезапустите синхронизацию.', 'success');
+            }}
+            className="w-full mt-3 py-3 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 600 }}
+          >
+            Очистить кэш
           </button>
         </div>
 
-        {/* Biometric & 2FA */}
-        <div className="rounded-xl p-4" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)' }}>
-          {[
-            { label: 'Биометрическая блокировка', state: biometric, toggle: () => setBiometric(!biometric) },
-            { label: 'Двухфакторная защита (2FA)', state: twoFa, toggle: () => setTwoFa(!twoFa) },
-          ].map((item, i) => (
-            <div key={item.label} className="flex items-center justify-between py-3"
-              style={{ borderBottom: i < 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>{item.label}</span>
-              <button onClick={item.toggle} className="w-11 h-6 rounded-full flex items-center px-0.5"
-                style={{ background: item.state ? '#4ADE80' : 'rgba(255,255,255,0.15)', justifyContent: item.state ? 'flex-end' : 'flex-start' }}>
-                <div className="w-5 h-5 rounded-full bg-white" />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* Other */}
         <div className="rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)' }}>
-          {['Кэш и офлайн-данные', 'Политика конфиденциальности', 'О приложении'].map((item, i) => (
-            <button key={item} onClick={() => showToast(item, 'info')}
-              className="w-full flex items-center justify-between px-4 py-3.5"
-              style={{ borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)' }}>{item}</span>
-              <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
-            </button>
-          ))}
+          <a
+            href="https://www.opendota.com/privacy"
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-between px-4 py-3.5"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+          >
+            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>Политика конфиденциальности</span>
+            <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
+          </a>
+          <button onClick={() => showToast('Dota Scope: аналитика матчей и сборок на базе OpenDota', 'info')}
+            className="w-full flex items-center justify-between px-4 py-3.5">
+            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>О приложении</span>
+            <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
+          </button>
         </div>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>Dota Scope v2.4.1 · Build 241</p>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>Dota Scope v{appVersion} · Build {appBuild}</p>
       </div>
     </>
   );
@@ -648,7 +651,7 @@ function ExportSection({ onBack }: { onBack: () => void }) {
 // ─── Devices ──────────────────────────────────────────────────────────────────
 function DevicesSection({ onBack }: { onBack: () => void }) {
   const { showToast, runtimeSnapshot, removeDevice, logoutAllDevices } = useApp();
-  const [devices, setDevices] = useState(DEVICES);
+  const [devices, setDevices] = useState(runtimeSnapshot.devices as any);
   const [confirmLogout, setConfirmLogout] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
 
@@ -668,10 +671,6 @@ function DevicesSection({ onBack }: { onBack: () => void }) {
 
   const otherDevices = devices.filter(d => !d.current);
   const currentDevice = devices.find(d => d.current);
-
-  React.useEffect(() => {
-    setDevices(runtimeSnapshot.devices as any);
-  }, [runtimeSnapshot.devices]);
 
   React.useEffect(() => {
     setDevices(runtimeSnapshot.devices as any);
@@ -986,18 +985,14 @@ export default function ProfileScreen() {
     <div className="flex flex-col min-h-full" style={{ background: '#080808' }}>
       <div className="flex items-center gap-3 px-4 py-3 sticky top-0 z-30"
         style={{ background: 'rgba(8,8,8,0.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 56 }}>
-        <div style={{ width: 24, height: 24, borderRadius: 6, background: `${accentColor}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 12 }}>◈</span>
-        </div>
+        <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'cover', border: `1px solid ${accentColor}33` }} />
         <p className="text-white" style={{ fontSize: 15, fontWeight: 700 }}>Профиль</p>
       </div>
 
       {/* Active account mini */}
       <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-3">
-          <div style={{ width: 52, height: 52, borderRadius: 15, background: `linear-gradient(135deg, ${accentColor}25, ${accentColor}45)`, border: `2px solid ${accentColor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 22 }}>🧙</span>
-          </div>
+          <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 52, height: 52, borderRadius: 15, objectFit: 'cover', border: `2px solid ${accentColor}35` }} />
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <p className="text-white" style={{ fontSize: 16, fontWeight: 700 }}>{activeAcc?.name ?? PLAYER.name}</p>

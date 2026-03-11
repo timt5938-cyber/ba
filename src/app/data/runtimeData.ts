@@ -19,8 +19,9 @@
   COMPARISON_PLAYER,
 } from './mockData';
 import { storage } from '../core/storage';
+import { appEnv } from '../core/env';
 
-const DATA_KEY = 'dota_scope_runtime_data_v1';
+const DATA_KEY = appEnv.useProductionBackend ? 'dota_scope_runtime_data_prod_v1' : 'dota_scope_runtime_data_v1';
 
 export interface RuntimeDataSnapshot {
   player: typeof PLAYER;
@@ -47,7 +48,32 @@ export interface RuntimeDataSnapshot {
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-export const getDefaultSnapshot = (): RuntimeDataSnapshot => ({
+const maybeFixMojibake = (value: string): string => {
+  if (!/[ÐÑРС]/.test(value)) return value;
+  try {
+    const bytes = new Uint8Array(Array.from(value).map(ch => ch.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    if (/[А-Яа-яЁё]/.test(decoded)) return decoded;
+  } catch {
+    // noop
+  }
+  return value;
+};
+
+const sanitizeStrings = <T,>(input: T): T => {
+  if (typeof input === 'string') return maybeFixMojibake(input) as T;
+  if (Array.isArray(input)) return input.map(v => sanitizeStrings(v)) as T;
+  if (input && typeof input === 'object') {
+    const next: any = {};
+    Object.entries(input as Record<string, any>).forEach(([k, v]) => {
+      next[k] = sanitizeStrings(v);
+    });
+    return next as T;
+  }
+  return input;
+};
+
+const createMockSnapshot = (): RuntimeDataSnapshot => ({
   player: clone(PLAYER),
   matches: clone(MATCHES),
   heroStats: clone(HERO_STATS),
@@ -69,6 +95,54 @@ export const getDefaultSnapshot = (): RuntimeDataSnapshot => ({
   },
   comparisonPlayer: clone(COMPARISON_PLAYER),
 });
+
+const createProdEmptySnapshot = (): RuntimeDataSnapshot => {
+  const base = createMockSnapshot();
+  return {
+    ...base,
+    player: {
+      ...base.player,
+      id: '',
+      name: '',
+      steamId: '',
+      steamUrl: '',
+      wins: 0,
+      losses: 0,
+      totalMatches: 0,
+      winrate: 0,
+      avgKDA: 0,
+      avgGPM: 0,
+      avgXPM: 0,
+      mmr: 0,
+      rankTier: 0,
+      rank: 'Unknown',
+      lastSync: '',
+      lastMatch: '',
+    } as any,
+    matches: [] as any,
+    heroStats: [] as any,
+    builds: [] as any,
+    goals: [] as any,
+    notifications: [] as any,
+    devices: [] as any,
+    achievements: [] as any,
+    syncHistory: [] as any,
+    steamAccounts: [] as any,
+    analytics: {
+      winrateDaily: [] as any,
+      winrateWeekly: [] as any,
+      gpmTrend: [] as any,
+      kdaTrend: [] as any,
+      roleStats: [] as any,
+      sideStats: [] as any,
+      heroWinrateChart: [] as any,
+    },
+  };
+};
+
+export const getDefaultSnapshot = (): RuntimeDataSnapshot => (
+  appEnv.useProductionBackend ? createProdEmptySnapshot() : createMockSnapshot()
+);
 
 const replaceArray = <T>(target: T[], source: T[]) => {
   target.splice(0, target.length, ...source);
@@ -98,12 +172,16 @@ export const applySnapshotToRuntimeData = (snapshot: RuntimeDataSnapshot) => {
 };
 
 export const loadRuntimeSnapshot = (): RuntimeDataSnapshot => {
+  if (appEnv.useProductionBackend) {
+    return getDefaultSnapshot();
+  }
   const saved = storage.get<RuntimeDataSnapshot | null>(DATA_KEY, null);
   if (!saved) return getDefaultSnapshot();
-  return saved;
+  return sanitizeStrings(saved);
 };
 
 export const saveRuntimeSnapshot = (snapshot: RuntimeDataSnapshot) => {
   storage.set(DATA_KEY, snapshot);
 };
+
 

@@ -8,17 +8,27 @@ import { HeroIcon } from '../components/ui/HeroIcon';
 import { Badge, RankBadge, StatusDot } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
-import { PLAYER, HERO_STATS, MATCHES, formatTime, WINRATE_DAILY } from '../data/mockData';
-
-const CALENDAR_DATA = Array.from({ length: 90 }, (_, i) => ({
-  day: i,
-  value: Math.random() > 0.3 ? Math.floor(Math.random() * 10) + 1 : 0,
-}));
+import { formatTime } from '../data/mockData';
 
 export default function AccountScreen() {
   const navigate = useNavigate();
-  const { accentColor, showToast, syncNow } = useApp();
+  const { accentColor, showToast, syncNow, runtimeSnapshot } = useApp();
   const [syncing, setSyncing] = useState(false);
+  const PLAYER: any = runtimeSnapshot.player;
+  const HERO_STATS: any[] = runtimeSnapshot.heroStats as any[];
+  const MATCHES: any[] = runtimeSnapshot.matches as any[];
+  const now = new Date();
+  const CALENDAR_DATA = Array.from({ length: 90 }, (_, i) => {
+    const date = new Date(now);
+    date.setDate(now.getDate() - (89 - i));
+    const matchesForDay = MATCHES.filter((m) => {
+      const matchDate = new Date(m.date);
+      return matchDate.toDateString() === date.toDateString();
+    }).length;
+    return { day: i, value: matchesForDay, date };
+  });
+  const startLabel = CALENDAR_DATA[0]?.date?.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) || '';
+  const endLabel = CALENDAR_DATA[CALENDAR_DATA.length - 1]?.date?.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' }) || '';
 
   const handleSync = async () => {
     setSyncing(true);
@@ -128,7 +138,7 @@ export default function AccountScreen() {
             {CALENDAR_DATA.map((d, i) => (
               <div
                 key={i}
-                title={`${d.value} матчей`}
+                title={`${d.date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })}: ${d.value} матчей`}
                 style={{
                   width: 9, height: 9, borderRadius: 2,
                   background: d.value === 0 ? 'rgba(255,255,255,0.05)' : accentColor,
@@ -138,8 +148,8 @@ export default function AccountScreen() {
             ))}
           </div>
           <div className="flex justify-between mt-2">
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>3 месяца назад</span>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Сегодня</span>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{startLabel}</span>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{endLabel}</span>
           </div>
         </div>
 

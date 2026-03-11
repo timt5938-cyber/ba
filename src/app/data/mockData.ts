@@ -893,9 +893,9 @@ export function formatTime(iso: string): string {
   const now = new Date();
   const diffH = Math.floor((now.getTime() - d.getTime()) / 3_600_000);
   if (diffH < 1)   return 'только что';
-  if (diffH < 24)  return `${diffH}С‡ назад`;
+  if (diffH < 24)  return `${diffH}ч назад`;
   const diffD = Math.floor(diffH / 24);
-  if (diffD < 7)   return `${diffD}Рґ назад`;
+  if (diffD < 7)   return `${diffD}д назад`;
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 

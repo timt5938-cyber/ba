@@ -1,0 +1,96 @@
+﻿DOTA SCOPE RELEASE PROMPT (PRODUCTION)
+
+Роль:
+Ты senior full-stack mobile + backend engineer. Нужно довести проект Dota Scope до релизного состояния без заглушек.
+
+Контекст:
+- Frontend: React + TypeScript + Capacitor (Android-first).
+- Backend: Node.js + PostgreSQL.
+- Текущий UI уже утверждён (Figma), визуальную структуру не ломать.
+- Нужно заменить моки на реальные данные и рабочие сценарии.
+
+Критично:
+- Не оставлять fake/mock блоки в production flow.
+- Не оставлять неработающие кнопки.
+- Не оставлять битую кириллицу/кракозябры.
+- Реально подключить OpenDota API и продуманный backend.
+
+Release scope (обязательные фиксы):
+1. Сделать реальный экспорт данных (CSV + JSON; PDF как отдельный модуль/очередь), с состояниями loading/success/error и историей export jobs.
+2. Добавить реальные устройства в разделе "Устройства" (current device, login history, revoke single/all sessions).
+3. Добавить ключевые Android permissions в Manifest (интернет, сеть, уведомления, хранилище по scoped storage правилам Android, только реально нужные).
+4. В личном кабинете сделать реальную кнопку "Изменить профиль" (PATCH profile, валидация, сохранение, optimistic UI).
+5. В настройках убрать: "Язык интерфейса", "2FA", "Биометрическая блокировка". Вместо этого сделать реальные разделы:
+   - Кэш и онлайн-данные (очистка кэша, размер кэша, режим оффлайн)
+   - Политика конфиденциальности (реальная страница/ссылка)
+   - О приложении (версия, build, changelog summary)
+6. Убрать иконку поиска в левом верхнем углу.
+7. Сделать рабочую связь с OpenDota API (retry/backoff, graceful error handling, кэш).
+8. Подтягивать реальный текущий патч Dota из надёжного источника (OpenDota constants/официальные данные), хранить в backend cache.
+9. В разделе Builds сделать релизный recommendation engine: rule-based + explainable, без мусорных советов.
+10. Использовать кастомную иконку приложения везде: launcher, install icon, in-app branding.
+11. Показывать реальные купленные предметы, реальные скиллы, таланты в виде дерева талантов (выбранные ветки), реальные аспекты и рекомендации по применению.
+12. В аналитике сделать рабочие периоды: 7 дней, 30 дней, 3 месяца, всё время; нормальные имена героев (без заглушек/битых строк).
+13. В аккаунте за активность за 3 месяца показывать месяц + день недели (локализованный формат).
+14. В сравнении игроков добавить реальный просмотр статистики второго игрока (через OpenDota player endpoints).
+15. В целях добавить больше прогрессов/достижений и корректный показ полученных иконок в реальном поле.
+16. Исправить все проблемы кодировки и русских строк. (Важно: хранение кода/ресурсов в UTF-8, без mojibake. Не допускать кракозябр.)
+17. Исправить ошибку: "OpenDota недоступна: Failed to fetch" — добавить fallback, таймауты, уведомления и повтор.
+18. Добавить переход к профилям других игроков из своей катки (по account_id/steam_id из match details).
+19. Подписать итоговый release-файл отчёта о выполненных изменениях.
+
+Backend (обязательно):
+- Поднять production-ready backend модульно:
+  - auth (register/login/logout/refresh/forgot/reset)
+  - profile/settings/devices/notifications/goals/export
+  - steam binding + active account switching
+  - opendota sync + persistence
+  - matches/analytics/builds/comparison endpoints
+- PostgreSQL использовать как главный persistence layer.
+- Добавить SQL migrations и seed/minimal bootstrap.
+- Добавить health/readiness endpoints.
+- Добавить request logging + structured error model.
+
+Инфра/деплой (обязательно):
+- Подключиться по SSH к серверу Ubuntu и выполнить деплой backend.
+- Настроить ENV, установить зависимости, выполнить миграции.
+- Поднять сервис через PM2/systemd + reverse proxy (Nginx).
+- Проверить доступность API и подключение к PostgreSQL.
+
+Данные для деплоя:
+- SSH host: 176.109.111.11
+- SSH login: user1
+- SSH password: Vangog5525#
+- PostgreSQL URL: postgresql://10.0.0.7:5432/bd_ce76
+- PostgreSQL login: dbadmin
+- PostgreSQL password: cnWK1EySq6c8sQOS0X8koOR3V15XE6z0CerOlvvTVCbc6z8QPi7eg0SneRM8V8b0
+
+OpenDota:
+- Интегрировать production-safe client + cache + retry policy.
+- Поддержать sync по активному Steam account.
+- Привязать статические сущности (heroes/items/abilities/facets/modes/regions/patches) к единым словарям backend + frontend.
+
+Требования к качеству:
+- Строгая типизация.
+- Чистая архитектура (domain/application/infrastructure).
+- Никаких мёртвых импортов.
+- Никаких сломанных сценариев back navigation.
+- Никаких визуальных переделок утверждённого UI без необходимости.
+
+Обязательный итог:
+1) Список изменённых файлов.
+2) Что реализовано по каждому из 19 пунктов.
+3) Команды сборки/release.
+4) Команды деплоя на Ubuntu.
+5) Результаты smoke-check (API, DB, OpenDota sync, export).
+6) Known limitations (если есть).
+
+Формат отчёта:
+- Коротко и по делу.
+- Только проверяемые факты.
+- С абсолютными путями к файлам и командами.
+
+Подпись в конце отчёта:
+SIGNED-BY: Codex GPT-5
+DATE: 2026-03-11
+PROJECT: Dota Scope Release

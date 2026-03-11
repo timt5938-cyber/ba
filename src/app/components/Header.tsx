@@ -1,17 +1,16 @@
 ﻿import React from 'react';
 import { useNavigate } from 'react-router';
-import { Menu, Bell, RefreshCw, Search } from 'lucide-react';
+import { Menu, Bell, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 interface Props {
   title: string;
-  showSearch?: boolean;
   showBack?: boolean;
   onBack?: () => void;
   rightElement?: React.ReactNode;
 }
 
-export function Header({ title, showSearch = false, rightElement }: Props) {
+export function Header({ title, rightElement }: Props) {
   const { setDrawerOpen, accentColor, showToast, runtimeSnapshot, syncNow } = useApp();
   const navigate = useNavigate();
   const unread = runtimeSnapshot.notifications.filter((n: any) => !n.read).length;
@@ -28,25 +27,13 @@ export function Header({ title, showSearch = false, rightElement }: Props) {
       style={{ background: 'rgba(8,8,8,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 56 }}
     >
       <div className="flex items-center gap-2 flex-shrink-0" onClick={() => navigate('/app/games')} style={{ cursor: 'pointer' }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, ${accentColor}33, ${accentColor}66)`, border: `1px solid ${accentColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>DS</span>
-        </div>
+        <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover', border: `1px solid ${accentColor}44`, background: '#0B0B0B' }} />
         <span className="text-white" style={{ fontSize: 15, fontWeight: 700, letterSpacing: 0.5 }}>{title}</span>
       </div>
 
       <div className="flex-1" />
 
       <div className="flex items-center gap-1">
-        {showSearch && (
-          <button
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-            style={{ background: 'rgba(255,255,255,0.05)' }}
-            onClick={() => {}}
-          >
-            <Search size={16} color="rgba(255,255,255,0.6)" />
-          </button>
-        )}
-
         <button
           className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
           style={{ background: 'rgba(255,255,255,0.05)' }}

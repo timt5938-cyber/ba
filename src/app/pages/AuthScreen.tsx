@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { safeBack } from '../core/navigation';
+import { appEnv } from '../core/env';
 
 type Tab = 'login' | 'register' | 'forgot';
 
@@ -18,6 +19,9 @@ function AuthInput({ icon, ...props }: AuthInputProps) {
       <div className="absolute left-3.5 top-1/2 -translate-y-1/2">{icon}</div>
       <input
         {...props}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         className="w-full pl-10 pr-4 py-3.5 rounded-xl text-white placeholder:text-white/30 outline-none"
         style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 14 }}
       />
@@ -79,7 +83,7 @@ export default function AuthScreen() {
         if (resetStage === 'request') {
           const code = await forgotPassword(identity);
           setResetStage('confirm');
-          setSuccess(`Код отправлен. Dev-код: ${code}`);
+          setSuccess(appEnv.useProductionBackend ? 'Код отправлен. Проверьте почту.' : `Код отправлен: ${code}`);
           return;
         }
         await resetPassword(identity, resetCode, newPassword);
@@ -115,9 +119,7 @@ export default function AuthScreen() {
       </div>
 
       <div className="flex flex-col items-center pt-6 pb-8">
-        <div style={{ width: 60, height: 60, borderRadius: 18, background: `linear-gradient(135deg, ${accentColor}25, ${accentColor}45)`, border: `1.5px solid ${accentColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 28 }}>?</span>
-        </div>
+        <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 60, height: 60, borderRadius: 18, objectFit: 'cover', border: `1.5px solid ${accentColor}40`, marginBottom: 12 }} />
         <h1 className="text-white" style={{ fontSize: 24, fontWeight: 800 }}>Dota Scope</h1>
       </div>
 
@@ -166,6 +168,9 @@ export default function AuthScreen() {
               placeholder="Пароль"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="w-full pl-10 pr-12 py-3.5 rounded-xl text-white placeholder:text-white/30 outline-none"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 14 }}
             />
@@ -219,13 +224,6 @@ export default function AuthScreen() {
                   : 'Сбросить пароль'}
         </button>
 
-        {tab !== 'forgot' && (
-          <div className="rounded-xl p-3" style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
-            <p style={{ fontSize: 12, color: '#93C5FD' }}>
-              Dev login: `demo@dotascope.dev` / `123456`
-            </p>
-          </div>
-        )}
       </form>
 
       <div className="pb-8 pt-4 text-center">

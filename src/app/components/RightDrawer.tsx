@@ -74,9 +74,7 @@ export function RightDrawer() {
         <div className="flex items-center justify-between px-4 py-4"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-2">
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, ${accentColor}33, ${accentColor}55)`, border: `1px solid ${accentColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>DS</span>
-            </div>
+            <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover', border: `1px solid ${accentColor}44` }} />
             <span className="text-white" style={{ fontSize: 15, fontWeight: 700 }}>Dota Scope</span>
           </div>
           <button onClick={() => setDrawerOpen(false)}
@@ -88,9 +86,7 @@ export function RightDrawer() {
 
         <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
           <div className="flex items-center gap-3">
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}44)`, border: `1.5px solid ${accentColor}44`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>GB</span>
-            </div>
+            <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 42, height: 42, borderRadius: 12, objectFit: 'cover', border: `1.5px solid ${accentColor}44` }} />
             <div className="flex-1 min-w-0">
               <p className="text-white truncate" style={{ fontSize: 14, fontWeight: 600 }}>
                 {activeAcc?.name ?? 'GhostBlade'}

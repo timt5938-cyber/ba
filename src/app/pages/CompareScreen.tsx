@@ -5,13 +5,18 @@ import { Header } from '../components/Header';
 import { WinrateRing } from '../components/ui/WinrateRing';
 import { HeroIcon } from '../components/ui/HeroIcon';
 import { useApp } from '../context/AppContext';
+import { resolveSteamProfile } from '../core/steam';
+import { openDotaClient } from '../core/opendotaClient';
+import { useSearchParams } from 'react-router';
 
 type CompareTab = 'overview' | 'stats' | 'heroes' | 'skills';
 
 export default function CompareScreen() {
-  const { accentColor, runtimeSnapshot } = useApp();
+  const { accentColor, runtimeSnapshot, updateComparisonPlayer, showToast } = useApp();
+  const [params] = useSearchParams();
   const [tab, setTab] = useState<CompareTab>('overview');
   const [searchInput, setSearchInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const PLAYER: any = runtimeSnapshot.player;
   const COMPARISON_PLAYER: any = runtimeSnapshot.comparisonPlayer;
@@ -53,6 +58,111 @@ export default function CompareScreen() {
     { id: 'skills', label: 'Навыки' },
   ];
 
+  const accountId32From64 = (steamId64: string): number => {
+    const base = BigInt('76561197960265728');
+    return Number(BigInt(steamId64) - base);
+  };
+
+  const parseInputToAccount = async (input: string): Promise<number> => {
+    const normalized = input.trim();
+    if (!normalized) throw new Error('Введите Steam ID или ссылку steamcommunity.com');
+    if (/^\d+$/.test(normalized)) {
+      if (normalized.length >= 16) return accountId32From64(normalized);
+      return Number(normalized);
+    }
+    if (normalized.startsWith('http')) {
+      const profile = await resolveSteamProfile(normalized);
+      if (profile.steamId64) return accountId32From64(profile.steamId64);
+    }
+    throw new Error('Поддерживаются только Steam ID32/ID64 и Steam URL.');
+  };
+
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      const accountId = await parseInputToAccount(searchInput);
+      const [player, wl, recent] = await Promise.all([
+        openDotaClient.getPlayer(accountId),
+        openDotaClient.getPlayerWl(accountId),
+        openDotaClient.getRecentMatches(accountId, 40),
+      ]);
+      const wins = wl.win || 0;
+      const losses = wl.lose || 0;
+      const total = wins + losses;
+      const avgKDA = recent.length
+        ? recent.reduce((sum, m) => sum + ((m.kills + m.assists) / Math.max(1, m.deaths)), 0) / recent.length
+        : 0;
+      const avgGPM = recent.length ? Math.round(recent.reduce((sum, m) => sum + (m.gold_per_min || 0), 0) / recent.length) : 0;
+      const avgXPM = recent.length ? Math.round(recent.reduce((sum, m) => sum + (m.xp_per_min || 0), 0) / recent.length) : 0;
+      updateComparisonPlayer({
+        id: String(player.profile?.account_id || accountId),
+        name: player.profile?.personaname || `Player ${accountId}`,
+        steamId: String(player.profile?.account_id || accountId),
+        steamUrl: player.profile?.profileurl || `https://www.opendota.com/players/${accountId}`,
+        rank: player.rank_tier ? `Tier ${player.rank_tier}` : 'Unknown',
+        rankTier: player.rank_tier || 0,
+        mmr: player.mmr_estimate?.estimate || 0,
+        wins,
+        losses,
+        totalMatches: total,
+        winrate: total ? Number(((wins / total) * 100).toFixed(1)) : 0,
+        avgKDA: Number(avgKDA.toFixed(2)),
+        avgGPM,
+        avgXPM,
+        lastSync: new Date().toISOString(),
+      } as any);
+      showToast('Игрок для сравнения загружен', 'success');
+    } catch (error: any) {
+      showToast(error?.message || 'Не удалось загрузить игрока', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    const playerParam = params.get('player');
+    if (!playerParam) return;
+    setSearchInput(playerParam);
+    const autoLoad = async () => {
+      try {
+        const accountId = await parseInputToAccount(playerParam);
+        const [player, wl, recent] = await Promise.all([
+          openDotaClient.getPlayer(accountId),
+          openDotaClient.getPlayerWl(accountId),
+          openDotaClient.getRecentMatches(accountId, 40),
+        ]);
+        const wins = wl.win || 0;
+        const losses = wl.lose || 0;
+        const total = wins + losses;
+        const avgKDA = recent.length
+          ? recent.reduce((sum, m) => sum + ((m.kills + m.assists) / Math.max(1, m.deaths)), 0) / recent.length
+          : 0;
+        const avgGPM = recent.length ? Math.round(recent.reduce((sum, m) => sum + (m.gold_per_min || 0), 0) / recent.length) : 0;
+        const avgXPM = recent.length ? Math.round(recent.reduce((sum, m) => sum + (m.xp_per_min || 0), 0) / recent.length) : 0;
+        updateComparisonPlayer({
+          id: String(player.profile?.account_id || accountId),
+          name: player.profile?.personaname || `Player ${accountId}`,
+          steamId: String(player.profile?.account_id || accountId),
+          steamUrl: player.profile?.profileurl || `https://www.opendota.com/players/${accountId}`,
+          rank: player.rank_tier ? `Tier ${player.rank_tier}` : 'Unknown',
+          rankTier: player.rank_tier || 0,
+          mmr: player.mmr_estimate?.estimate || 0,
+          wins,
+          losses,
+          totalMatches: total,
+          winrate: total ? Number(((wins / total) * 100).toFixed(1)) : 0,
+          avgKDA: Number(avgKDA.toFixed(2)),
+          avgGPM,
+          avgXPM,
+          lastSync: new Date().toISOString(),
+        } as any);
+      } catch {
+        // ignore auto-load failures
+      }
+    };
+    autoLoad();
+  }, [params, updateComparisonPlayer]);
+
   return (
     <div className="flex flex-col min-h-full" style={{ background: '#080808' }}>
       <Header title="Dota Scope" />
@@ -80,7 +190,11 @@ export default function CompareScreen() {
       <div className="px-4 mb-4">
         <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <Search size={15} color="rgba(255,255,255,0.4)" />
-          <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Steam-ссылка или имя игрока..." className="flex-1 bg-transparent outline-none text-white placeholder:text-white/30" style={{ fontSize: 13 }} />
+          <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Steam ID32/ID64 или steamcommunity URL" className="flex-1 bg-transparent outline-none text-white placeholder:text-white/30" style={{ fontSize: 13 }} />
+          <button onClick={handleSearch} disabled={loading} className="px-2 py-1 rounded-lg"
+            style={{ background: loading ? 'rgba(255,255,255,0.25)' : accentColor, color: '#000', fontSize: 12, fontWeight: 700 }}>
+            {loading ? '...' : 'OK'}
+          </button>
         </div>
       </div>
 

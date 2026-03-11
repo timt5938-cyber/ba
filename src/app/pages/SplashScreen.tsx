@@ -2,6 +2,8 @@
 import { useNavigate } from 'react-router';
 import { ChevronRight, BarChart3, Sword, Trophy, TrendingUp } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { appEnv } from '../core/env';
+import { storage } from '../core/storage';
 
 const SLIDES = [
   {
@@ -33,6 +35,7 @@ const SLIDES = [
 export default function SplashScreen() {
   const navigate = useNavigate();
   const { accentColor } = useApp();
+  const onboardingSeen = storage.get<boolean>('dota_scope_onboarding_seen_v1', false);
   const [phase, setPhase] = useState<'splash' | 'onboarding'>('splash');
   const [slide, setSlide] = useState(0);
   const [visible, setVisible] = useState(true);
@@ -40,10 +43,17 @@ export default function SplashScreen() {
   useEffect(() => {
     const t = setTimeout(() => {
       setVisible(false);
-      setTimeout(() => { setPhase('onboarding'); setVisible(true); }, 400);
+      setTimeout(() => {
+        if (onboardingSeen) {
+          navigate('/auth', { replace: true });
+          return;
+        }
+        setPhase('onboarding');
+        setVisible(true);
+      }, 400);
     }, 2000);
     return () => clearTimeout(t);
-  }, []);
+  }, [navigate, onboardingSeen]);
 
   const nextSlide = () => {
     if (slide < SLIDES.length - 1) {
@@ -52,7 +62,12 @@ export default function SplashScreen() {
     }
   };
 
-  const skip = () => navigate('/auth');
+  const completeOnboarding = (target = '/auth') => {
+    storage.set('dota_scope_onboarding_seen_v1', true);
+    navigate(target, { replace: true });
+  };
+
+  const skip = () => completeOnboarding('/auth');
 
   const current = SLIDES[slide];
 
@@ -70,9 +85,7 @@ export default function SplashScreen() {
         <div className="relative flex items-center justify-center mb-8">
           <div className="absolute rounded-full" style={{ width: 180, height: 180, border: `1px solid ${accentColor}12` }} />
           <div className="absolute rounded-full" style={{ width: 130, height: 130, border: `1px solid ${accentColor}20` }} />
-          <div className="rounded-full flex items-center justify-center" style={{ width: 90, height: 90, background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}44)`, border: `2px solid ${accentColor}55` }}>
-            <span style={{ fontSize: 42 }}>◈</span>
-          </div>
+          <img src="/dota-scope-icon.png" alt="Dota Scope" style={{ width: 90, height: 90, borderRadius: 999, objectFit: 'cover', border: `2px solid ${accentColor}55` }} />
         </div>
 
         <h1 className="text-white" style={{ fontSize: 32, fontWeight: 800, letterSpacing: 1 }}>Dota Scope</h1>
@@ -154,25 +167,27 @@ export default function SplashScreen() {
         ) : (
           <>
             <button
-              onClick={() => navigate('/auth?tab=login')}
+              onClick={() => completeOnboarding('/auth?tab=login')}
               className="w-full py-4 rounded-2xl text-black"
               style={{ background: '#FFFFFF', fontSize: 15, fontWeight: 700 }}
             >
               Войти
             </button>
             <button
-              onClick={() => navigate('/auth?tab=register')}
+              onClick={() => completeOnboarding('/auth?tab=register')}
               className="w-full py-4 rounded-2xl text-white"
               style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', fontSize: 15, fontWeight: 600 }}
             >
               Создать аккаунт
             </button>
-            <button
-              onClick={() => navigate('/app/games')}
-              style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', paddingTop: 8 }}
-            >
-              Продолжить как гость
-            </button>
+            {!appEnv.useProductionBackend && (
+              <button
+                onClick={() => completeOnboarding('/app/games')}
+                style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', paddingTop: 8 }}
+              >
+                Продолжить как гость
+              </button>
+            )}
           </>
         )}
       </div>

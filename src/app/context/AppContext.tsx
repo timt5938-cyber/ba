@@ -5,6 +5,7 @@ import { authService } from '../core/authService';
 import { dataSyncService } from '../core/dataSyncService';
 import { SyncResult } from '../domain/types';
 import { staticsService } from '../core/staticsService';
+import { appEnv } from '../core/env';
 
 interface Toast {
   id: string;
@@ -46,6 +47,8 @@ interface AppContextType {
 
   syncNow: () => Promise<SyncResult>;
   exportData: () => Promise<void>;
+  updateProfile: (patch: Partial<RuntimeDataSnapshot['player']>) => void;
+  updateComparisonPlayer: (patch: Partial<RuntimeDataSnapshot['comparisonPlayer']>) => void;
 
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -80,6 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<RuntimeDataSnapshot>(initialSnapshot);
   const [dataRevision, setDataRevision] = useState(0);
   const [staticsLoaded, setStaticsLoaded] = useState(false);
+  const didInitialSyncRef = React.useRef(false);
 
   const existingSession = authService.getSession();
   const [isAuthenticated, setAuthenticated] = useState(Boolean(existingSession));
@@ -121,7 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const syncNow = useCallback(async () => {
     const active = steamAccounts.find(a => a.id === activeAccountId) ?? steamAccounts[0];
-    if (!active?.id) {
+    if (!active?.id && !appEnv.useProductionBackend) {
       const result: SyncResult = {
         status: 'error',
         startedAt: new Date().toISOString(),
@@ -134,7 +138,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     try {
-      const { snapshot, result } = await dataSyncService.syncBySteamId(runtimeSnapshot, active.id);
+      const { snapshot, result } = await dataSyncService.syncBySteamId(runtimeSnapshot, active?.id || '');
       persistSnapshot(snapshot);
       if (snapshot.steamAccounts?.length > 0) {
         setSteamAccounts(snapshot.steamAccounts as any);
@@ -145,6 +149,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }, [activeAccountId, persistSnapshot, runtimeSnapshot, showToast, steamAccounts]);
+
+  React.useEffect(() => {
+    if (!appEnv.useProductionBackend) return;
+    if (!isAuthenticated) {
+      didInitialSyncRef.current = false;
+      return;
+    }
+    if (didInitialSyncRef.current) return;
+    didInitialSyncRef.current = true;
+    syncNow().catch(() => undefined);
+  }, [isAuthenticated, syncNow]);
 
   const switchAccount = useCallback(async (id: string) => {
     setSteamAccounts(prev => prev.map(a => ({ ...a, active: a.id === id })));
@@ -188,7 +203,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const bound = await dataSyncService.bindSteamProfile(url);
-      const id = bound.steamId64 || `tmp_${Math.random().toString(36).slice(2, 10)}`;
+      const id = appEnv.useProductionBackend
+        ? (bound.accountId || bound.steamId64 || '')
+        : (bound.steamId64 || '');
+      if (!id) {
+        throw new Error('Не удалось определить Steam ID. Проверьте ссылку профиля.');
+      }
       const account: SteamAccount = {
         id,
         name: bound.displayName || bound.vanityName || 'Steam User',
@@ -261,6 +281,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     emitDownload(`dota-scope-builds-${stamp}.csv`, bundle.buildsCsv, 'text/csv;charset=utf-8');
   }, [runtimeSnapshot]);
 
+  const updateProfile = useCallback((patch: Partial<RuntimeDataSnapshot['player']>) => {
+    updateSnapshot((snapshot) => {
+      snapshot.player = { ...snapshot.player, ...patch } as any;
+      return snapshot;
+    });
+  }, [updateSnapshot]);
+
+  const updateComparisonPlayer = useCallback((patch: Partial<RuntimeDataSnapshot['comparisonPlayer']>) => {
+    updateSnapshot((snapshot) => {
+      snapshot.comparisonPlayer = { ...snapshot.comparisonPlayer, ...patch } as any;
+      return snapshot;
+    });
+  }, [updateSnapshot]);
+
   const markNotificationRead = useCallback((id: string) => {
     updateSnapshot((snapshot) => {
       snapshot.notifications = snapshot.notifications.map((n: any) => n.id === id ? { ...n, read: true } : n) as any;
@@ -323,6 +357,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       steamAccounts, activeAccountId, switchAccount, addAccount, removeAccount, addAccountByUrl,
       register, login, logout, forgotPassword, resetPassword,
       syncNow, exportData,
+      updateProfile, updateComparisonPlayer,
       markNotificationRead, markAllNotificationsRead,
       upsertGoal, removeGoal,
       removeDevice, logoutAllDevices,

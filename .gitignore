@@ -1,0 +1,6 @@
+﻿node_modules/
+backend/node_modules/
+backend/dist/
+*.log
+.env
+backend/.env

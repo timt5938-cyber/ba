@@ -6,11 +6,11 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: false,
+    cleartext: true,
   },
   android: {
-    allowMixedContent: false,
-    captureInput: false,
+    allowMixedContent: true,
+    captureInput: true,
     webContentsDebuggingEnabled: false,
     backgroundColor: '#080808',
     buildOptions: {
@@ -35,9 +35,9 @@ const config: CapacitorConfig = {
       overlaysWebView: false,
     },
     Keyboard: {
-      resize: 'native',
+      resize: 'body',
       style: 'dark',
-      resizeOnFullScreen: false,
+      resizeOnFullScreen: true,
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],

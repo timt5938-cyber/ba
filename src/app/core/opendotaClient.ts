@@ -72,7 +72,23 @@ class OpenDotaClient {
       url.searchParams.set('api_key', this.apiKey);
     }
 
-    const res = await fetch(url.toString());
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { signal: controller.signal });
+    } catch (error: any) {
+      if (attempt < 2) {
+        await wait((attempt + 1) * 800);
+        return this.request<T>(path, query, attempt + 1, withApiKey);
+      }
+      if (error?.name === 'AbortError') {
+        throw new Error('OpenDota timeout: превышено время ожидания');
+      }
+      throw new Error('OpenDota network error: проверьте подключение к интернету');
+    } finally {
+      clearTimeout(timeout);
+    }
     if (res.status === 429 && attempt < 3) {
       await wait((attempt + 1) * 600);
       return this.request<T>(path, query, attempt + 1, withApiKey);

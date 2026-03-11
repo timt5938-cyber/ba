@@ -1,6 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowLeft, Zap, Shield, Heart, Swords, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Zap, Shield, Heart, Swords, TrendingUp, GitCompareArrows } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { HeroIcon } from '../components/ui/HeroIcon';
 import { Badge } from '../components/ui/Badge';
@@ -8,6 +8,8 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
 import { formatDuration, formatTime, Match } from '../data/mockData';
 import { safeBack } from '../core/navigation';
+import { openDotaClient } from '../core/opendotaClient';
+import { HEROES } from '../data/mockData';
 
 const GOLD_TIMELINE = [
   { min: 0, gold: 0 }, { min: 5, gold: 3200 }, { min: 10, gold: 7400 }, { min: 15, gold: 12800 },
@@ -20,9 +22,25 @@ export default function MatchDetailScreen() {
   const navigate = useNavigate();
   const { accentColor, runtimeSnapshot } = useApp();
   const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'teams'>('overview');
+  const [matchPlayers, setMatchPlayers] = useState<Array<{ accountId: number; heroId: number; personaname?: string }>>([]);
 
   const matches = runtimeSnapshot.matches as Match[];
   const match = matches.find(m => m.id === matchId) ?? matches[0];
+  const heroByCdn = useMemo(() => Object.values(HEROES).reduce<Record<string, any>>((acc, h: any) => {
+    acc[h.cdnName] = h;
+    return acc;
+  }, {}), []);
+  const heroIdToCdn: Record<number, string> = {
+    1: 'antimage', 2: 'axe', 5: 'crystal_maiden', 8: 'juggernaut', 11: 'nevermore', 14: 'pudge', 16: 'sand_king',
+    18: 'sven', 22: 'zeus', 25: 'lina', 27: 'shadow_shaman', 37: 'warlock', 39: 'queenofpain', 47: 'viper',
+    63: 'weaver', 74: 'invoker', 86: 'rubick', 97: 'magnataur', 102: 'abaddon', 106: 'ember_spirit', 107: 'earth_spirit',
+    113: 'arc_warden', 126: 'void_spirit',
+  };
+  const resolveHero = (heroId: number) => {
+    const cdn = heroIdToCdn[heroId];
+    if (cdn && heroByCdn[cdn]) return heroByCdn[cdn];
+    return { id: `h-${heroId}`, name: `Hero #${heroId}`, short: `H${heroId}`, attr: 'uni', color: '#94A3B8', roles: ['Unknown'], cdnName: cdn || 'unknown' };
+  };
 
   const alliesEnemies = useMemo(() => {
     const sameSide = matches.filter(m => m.side === match?.side).slice(0, 4);
@@ -36,6 +54,23 @@ export default function MatchDetailScreen() {
   if (!match) {
     return <div className="p-6 text-white">Матч не найден</div>;
   }
+
+  React.useEffect(() => {
+    let mounted = true;
+    const loadPlayers = async () => {
+      try {
+        const details = await openDotaClient.getMatch(match.id);
+        const players = (details?.players || [])
+          .filter((p: any) => typeof p.account_id === 'number' && p.account_id > 0)
+          .map((p: any) => ({ accountId: p.account_id, heroId: p.hero_id, personaname: p.personaname }));
+        if (mounted) setMatchPlayers(players);
+      } catch {
+        if (mounted) setMatchPlayers([]);
+      }
+    };
+    loadPlayers();
+    return () => { mounted = false; };
+  }, [match.id]);
 
   const isWin = match.result === 'win';
   const resultColor = isWin ? '#4ADE80' : '#F87171';
@@ -136,6 +171,31 @@ export default function MatchDetailScreen() {
 
         {activeTab === 'teams' && (
           <div className="flex flex-col gap-4">
+            {matchPlayers.length > 0 && (
+              <div className="rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-white" style={{ fontSize: 13, fontWeight: 600 }}>Игроки из этой катки</p>
+                </div>
+                {matchPlayers.slice(0, 10).map((p, idx) => (
+                  <div key={`${p.accountId}-${idx}`} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: idx < matchPlayers.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <HeroIcon hero={resolveHero(p.heroId) as any} size={28} />
+                    <div className="flex-1">
+                      <p className="text-white" style={{ fontSize: 13, fontWeight: 500 }}>{p.personaname || `Player ${p.accountId}`}</p>
+                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>account_id: {p.accountId}</p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/app/comparison?player=${p.accountId}`)}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center"
+                      title="Сравнить игрока"
+                      style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)' }}
+                    >
+                      <GitCompareArrows size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid rgba(74,222,128,0.15)' }}>
               <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(74,222,128,0.06)' }}><span style={{ fontSize: 14 }}>🟢</span><p style={{ fontSize: 13, fontWeight: 600, color: '#4ADE80' }}>Allies</p></div>
               {[{ hero: match.hero, k: match.kills, d: match.deaths, a: match.assists, gpm: match.gpm, isMe: true }, ...alliesEnemies.allies].slice(0,5).map((p, i) => (
